@@ -1,0 +1,109 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+Rscript -e "rmarkdown::render('make_consensus_matrix_for_enrichment.Rmd')"
+```{r Loading packages}
+library(data.table)
+```
+
+
+Reading ywhaz significant correlations
+```{r Reading ywhaz significant correlations}
+ywhaz_sig_cor <- fread("/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/Corr_Results/Genes_sig_cor_YWHAZ_8_datasets.tsv")
+
+# dropping ywhaz V2 correlation
+ywhaz_sig_cor <- ywhaz_sig_cor[!grepl("_V2_", ywhaz_sig_cor$Datasets), ]
+
+# seperating pos/neg correlation
+ywhaz_sig_cor_all <- ywhaz_sig_cor[!grepl("pos|neg", ywhaz_sig_cor$Datasets), ]
+
+ywhaz_sig_cor_pos <- ywhaz_sig_cor[grepl("pos", ywhaz_sig_cor$Datasets), ]
+
+ywhaz_sig_cor_neg <- ywhaz_sig_cor[grepl("neg", ywhaz_sig_cor$Datasets), ]
+```
+
+
+ywhaz consensus_all matrix
+```{r ywhaz consensus matrix}
+# making frequency table
+ywhaz_consensus_all <- as.data.frame.matrix(table(ywhaz_sig_cor_all$Genes_cor_YWHAZ, ywhaz_sig_cor_all$Datasets))
+
+# counting significant correlations in consensus networks
+ywhaz_consensus_all$rowsum <- rowSums(ywhaz_consensus_all)
+
+
+# subsetting genes in each consensus network
+gene_consensus_sym_all <- lapply(seq(8), function(x) rownames(subset(ywhaz_consensus_all, rowsum == x)))
+
+gene_consensus_mod_all <- mapply(rep, paste0("Consensus_all_", seq(8)), lengths(gene_consensus_sym_all), MoreArgs = list(SIMPLIFY = F))
+
+gene_consensus_df_all <- mapply(cbind, gene_consensus_sym_all, gene_consensus_mod_all)
+
+gene_consensus_df_all <- lapply(gene_consensus_df_all, as.data.frame)
+
+gene_consensus_df_all <- rbindlist(gene_consensus_df_all)
+
+colnames(gene_consensus_df_all) <- c("Consensus_Gene", "Consensus_Network")
+```
+
+
+ywhaz consensus_pos matrix
+```{r ywhaz consensus matrix pos}
+# making frequency table
+ywhaz_consensus_pos <- as.data.frame.matrix(table(ywhaz_sig_cor_pos$Genes_cor_YWHAZ, ywhaz_sig_cor_pos$Datasets))
+
+# counting significant correlations in consensus networks
+ywhaz_consensus_pos$rowsum <- rowSums(ywhaz_consensus_pos)
+
+
+# subsetting genes in each consensus network
+gene_consensus_sym_pos <- lapply(seq(8), function(x) rownames(subset(ywhaz_consensus_pos, rowsum == x)))
+
+gene_consensus_mod_pos <- mapply(rep, paste0("Consensus_pos_", seq(8)), lengths(gene_consensus_sym_pos), MoreArgs = list(SIMPLIFY = F))
+
+gene_consensus_df_pos <- mapply(cbind, gene_consensus_sym_pos, gene_consensus_mod_pos)
+
+gene_consensus_df_pos <- lapply(gene_consensus_df_pos, as.data.frame)
+
+gene_consensus_df_pos <- rbindlist(gene_consensus_df_pos)
+
+colnames(gene_consensus_df_pos) <- c("Consensus_Gene", "Consensus_Network")
+```
+
+ywhaz consensus_neg matrix
+```{r ywhaz consensus matrix neg}
+# making frequency table
+ywhaz_consensus_neg <- as.data.frame.matrix(table(ywhaz_sig_cor_neg$Genes_cor_YWHAZ, ywhaz_sig_cor_neg$Datasets))
+
+# counting significant correlations in consensus networks
+ywhaz_consensus_neg$rowsum <- rowSums(ywhaz_consensus_neg)
+
+
+# subsetting genes in each consensus network
+gene_consensus_sym_neg <- lapply(seq(8), function(x) rownames(subset(ywhaz_consensus_neg, rowsum == x)))
+
+gene_consensus_mod_neg <- mapply(rep, paste0("Consensus_neg_", seq(8)), lengths(gene_consensus_sym_neg), MoreArgs = list(SIMPLIFY = F))
+
+gene_consensus_df_neg <- mapply(cbind, gene_consensus_sym_neg, gene_consensus_mod_neg)
+
+gene_consensus_df_neg <- lapply(gene_consensus_df_neg, as.data.frame)
+
+gene_consensus_df_neg <- rbindlist(gene_consensus_df_neg)
+
+colnames(gene_consensus_df_neg) <- c("Consensus_Gene", "Consensus_Network")
+```
+
+Combining the matricies
+```{r Combining the matricies}
+gene_consensus_df <- rbindlist(list(gene_consensus_df_all, gene_consensus_df_pos, gene_consensus_df_neg))
+```
+
+
+writing consensus df
+```{r writing consensus df}
+fwrite(gene_consensus_df, "/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/Corr_Results/Genes_sig_cor_YWHAZ_consensus.tsv", sep = "\t")
+```
+

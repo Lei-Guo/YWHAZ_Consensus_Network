@@ -1,0 +1,66 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Render the notebook with commandline Rscript -e "rmarkdown::render('make_expressionset.Rmd')"
+
+```{r loading packages, message = F}
+library(data.table)
+library(stringr)
+library(limma)
+library(Biobase)
+```
+
+
+Reading TPM
+```{r reading batch pmi race adjusted M values, message = F}
+# reading tpm
+invisible(tpm_ywhaz_ko_kd <- fread("/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/Datasets/YWHAZ_KO_KD_RNAseq_TPM_GSE66716_GSE60745.tsv", data.table = F))
+
+# naming the rows with the probe column
+rownames(tpm_ywhaz_ko_kd) <- tpm_ywhaz_ko_kd$V1
+tpm_ywhaz_ko_kd <- tpm_ywhaz_ko_kd[, -1]
+
+# convert tpm to matrix
+tpm_ywhaz_ko_kd <- as.matrix(tpm_ywhaz_ko_kd)
+
+# log2 transform
+tpm_ywhaz_ko_kd <- log2(tpm_ywhaz_ko_kd)
+```
+
+
+
+Reading Meta files
+```{r reading meta information}
+# read meta info
+meta_tpm_ywhaz_ko_kd <- fread("/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/Datasets/meta_GSE66716_GSE60745.csv", data.table = F)
+```
+
+
+Matching sample order between meta_tpm_ywhaz_ko_kd and tpm_ywhaz_ko_kd
+```{r matching sample order between meta_tpm_ywhaz_ko_kd and beta/m matricies}
+# match meta_tpm_ywhaz_ko_kd and tpm_ywhaz_ko_kd sample order
+meta_tpm_ywhaz_ko_kd <- meta_tpm_ywhaz_ko_kd[match(colnames(tpm_ywhaz_ko_kd), meta_tpm_ywhaz_ko_kd$SRA_Run_ID), ]
+rownames(meta_tpm_ywhaz_ko_kd) <- meta_tpm_ywhaz_ko_kd$SRA_Run_ID
+```
+
+
+Making expressionset for tpm
+```{r assembling expressionset for tpm_ywhaz_ko_kd}
+# check if rownames and colnames of meta_tpm_ywhaz_ko_kd and tpm_ywhaz_ko_kd are same
+identical(colnames(tpm_ywhaz_ko_kd), rownames(meta_tpm_ywhaz_ko_kd))
+
+# create meta info for the expressionset
+phenoData_tpm_ywhaz_ko_kd <- new("AnnotatedDataFrame", data = meta_tpm_ywhaz_ko_kd)
+
+# construct an expressionset for tpm_ywhaz_ko_kd
+exprset_tpm_ywhaz_ko_kd <- ExpressionSet(assayData = tpm_ywhaz_ko_kd, phenoData = phenoData_tpm_ywhaz_ko_kd)
+```
+
+
+Writing expressionsets
+```{r writing expressionsets for M values}
+saveRDS(exprset_tpm_ywhaz_ko_kd, file = "/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/Datasets/exprset_YWHAZ_KO_KD_RNAseq_TPM_GSE66716_GSE60745.rds")
+```
+

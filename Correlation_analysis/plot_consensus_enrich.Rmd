@@ -1,0 +1,53 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+Rscript -e "rmarkdown::render('plot_consensus_enrich.Rmd')"
+```{r Loading packages}
+library(data.table)
+library(ggplot2)
+library(stringr)
+```
+
+
+Reading Enrichment results
+```{r Reading Enrichment results}
+enrich_res <- fread("/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/Corr_Results/DEG_Consensus_Enrich/intersect_DEG-vs-Dataset_pair.xls")
+
+# seperating by consensus type
+enrich_res_all <- enrich_res[grepl("Consensus_all_", enrich_res$Dataset), ]
+
+enrich_res_pos <- enrich_res[grepl("Consensus_pos_", enrich_res$Dataset), ]
+
+enrich_res_neg <- enrich_res[grepl("Consensus_neg_", enrich_res$Dataset), ]
+```
+
+
+Plotting enrich_res_all
+```{r Plotting enrich_res_all}
+
+plot_all <- ggplot(enrich_res_all, aes(x = Dataset, y = -log10(FET_P_corrected), group = DEG)) + geom_line(aes(color=DEG), size = 1) + scale_color_manual(values=c("#000000", "#4363d8", "#f032e6", "#e6194B", "#ffe119", "#3cb44b", "#000075", "#800000", "#a9a9a9", "#42d4f4", "#bfef45", "#469990", "#aaffc3")) + labs(x = "Consensus_Network", y = "-log10 Adjusted P Value") + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Plotting enrich_res_pos
+```{r Plotting enrich_res_pos}
+
+plot_pos <- ggplot(enrich_res_pos, aes(x = Dataset, y = -log10(FET_P_corrected), group = DEG)) + geom_line(aes(color=DEG), size = 1) + scale_color_manual(values=c("#000000", "#4363d8", "#f032e6", "#e6194B", "#ffe119", "#3cb44b", "#000075", "#800000", "#a9a9a9", "#42d4f4", "#bfef45", "#469990", "#aaffc3")) + labs(x = "Consensus_Network", y = "-log10 Adjusted P Value") + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+Plotting enrich_res_neg
+```{r Plotting enrich_res_neg}
+
+plot_neg <- ggplot(enrich_res_neg, aes(x = Dataset, y = -log10(FET_P_corrected), group = DEG)) + geom_line(aes(color=DEG), size = 1) + scale_color_manual(values=c("#000000", "#4363d8", "#f032e6", "#e6194B", "#ffe119", "#3cb44b", "#000075", "#800000", "#a9a9a9", "#42d4f4", "#bfef45", "#469990", "#aaffc3")) + labs(x = "Consensus_Network", y = "-log10 Adjusted P Value") + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+Saving the results
+```{r Saving the results}
+ggsave("/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/Corr_Results/DEG_Consensus_Enrich/DEG_KD_KO_consensus_enrich_all.pdf", plot_all)
+ggsave("/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/Corr_Results/DEG_Consensus_Enrich/DEG_KD_KO_consensus_enrich_pos.pdf", plot_pos)
+ggsave("/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/Corr_Results/DEG_Consensus_Enrich/DEG_KD_KO_consensus_enrich_neg.pdf", plot_neg)
+```

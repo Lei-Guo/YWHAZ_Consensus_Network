@@ -1,0 +1,261 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Rscript -e "rmarkdown::render('correlation_ywhaz_all_gene.Rmd')"
+
+Loading packages
+```{r loading packages}
+library(wrapr)
+library(data.table)
+```
+
+
+Loading functions for matrix-matrix correlation analysis
+```{r loading functions for matrix-matrix correlation analysis}
+# get all indices of a matrix
+# for symetric matrix size is a number otherwise size=(row, col)
+getMatrixIndex = function(size, symmetric=T, diagonal=F)
+{
+   allidx = NULL
+
+   if(symmetric){
+      for(i in c(1:(size[1]-1)) ) {
+         iv = cbind(i, (i+1):size[1])
+         allidx = rbind(allidx, iv)
+      }
+      if(diagonal) {allidx = rbind(allidx, cbind(1:size[1], 1:size[1]) )}
+
+   } else {
+      for(i in c(1:(size[1])) ) {
+         iv = cbind(i, 1:(size[2]))
+         allidx = rbind(allidx, iv)
+      }
+   }
+
+   return (allidx)
+}
+
+
+simpleCorTest=function(x,y){
+signif( cor.test(x,y,method="p",use="p")$p.value ,2) 
+}
+
+# no of rows of amatrix is the same as the length of myvect
+corTest4multivects=function(myvect, amatrix){
+pvals = apply(amatrix, 2, simpleCorTest, y=myvect)
+#cat(pvals[], "\n")
+as.numeric(pvals)
+}
+
+# compute correlation coefficients (spearman, pearson), pvalues of the columns 
+corRhoPvalSpearmanPearson = function (datMatrix) {
+
+  rho=cor(datMatrix, method="pearson", use="complete.obs")
+  pval=apply(datMatrix, 2, corTest4multivects, datMatrix)
+
+  #datMatrixRank = apply(datMatrix, 2, rank)
+  rhoR=cor(datMatrix, method="spearman", use="complete.obs")
+  #pvalR=apply(datMatrixRank, 2, corTest4multivects, xdatMatrixRank)
+
+  midx = getMatrixIndex(size=dim(rho), symmetric=TRUE, diagonal=FALSE)
+  id1  = colnames(datMatrix)[midx[,1]]
+  corMatrix = cbind(colnames(datMatrix)[midx[,1]], colnames(datMatrix)[midx[,2]],
+              signif(rho[midx],3),signif(rhoR[midx],3), signif(pval[midx],3))
+  colnames(corMatrix) = c("TraitA", "TraitB", "rho_pearson", "rho_spearman", "pvalue")
+
+  return (corMatrix)
+
+}
+
+
+# compute correlation coefficients (spearman, pearson), pvalues of the columns 
+corRhoPvalSpearmanPearson_TwoMatrices = function (datMatrix, datMatrix2) {
+
+  rho=cor(datMatrix, datMatrix2, method="pearson", use="complete.obs")
+  pval=apply(datMatrix, 2, corTest4multivects, datMatrix2)
+  pval=t(pval)
+
+  datMatrixRank = apply(datMatrix, 2, rank)
+  datMatrixRank = matrix(as.integer(datMatrixRank), nrow=nrow(datMatrixRank))
+  #datMatrixRankT = t(datMatrixRank)
+
+  datMatrixRank2 = apply(datMatrix2, 2, rank)
+  datMatrixRank2 = matrix(as.integer(datMatrixRank2), nrow=nrow(datMatrixRank2))
+  #datMatrixRankT2 = t(datMatrixRank2)
+
+  rhoR=cor(datMatrixRank, datMatrixRank2, method="pearson", use="complete.obs")
+  pvalR=apply(datMatrixRank, 2, corTest4multivects, datMatrixRank2)
+  pvalR=t(pvalR)
+
+  midx = getMatrixIndex(size=dim(rho), symmetric=FALSE, diagonal=TRUE)
+  id1  = colnames(datMatrix)[midx[,1]]
+  corMatrix = cbind(colnames(datMatrix)[midx[,1]], colnames(datMatrix2)[midx[,2]],
+              signif(rho[midx],3),signif(pval[midx],3), signif(rhoR[midx],3), signif(pvalR[midx],3))
+  colnames(corMatrix) = c("TraitA", "TraitB", "rho_pearson", "pvalue_pearson", "rho_spearman", "pvalue_spearman")
+
+  return (corMatrix)
+
+}
+```
+
+
+Reading gene expression values for 8 brain regions
+```{r Reading gene expression values for 8 brain regions}
+# BM10
+expr_bm10 <- fread("/sc/orga/projects/zhangb03a/shared/msbb-seq/Data/mixed_model_correction_updated/msbb.BM_10.PMI_AOD_race_sex_RIN_exonicRate_rRnaRate_batch_adj.tsv")
+# BM22
+expr_bm22 <- fread("/sc/orga/projects/zhangb03a/shared/msbb-seq/Data/mixed_model_correction_updated/msbb.BM_22.PMI_AOD_race_sex_RIN_exonicRate_rRnaRate_batch_adj.tsv")
+# BM36
+expr_bm36 <- fread("/sc/orga/projects/zhangb03a/shared/msbb-seq/Data/mixed_model_correction_updated/msbb.BM_36.PMI_AOD_race_sex_RIN_exonicRate_rRnaRate_batch_adj.tsv")
+# BM44
+expr_bm44 <- fread("/sc/orga/projects/zhangb03a/shared/msbb-seq/Data/mixed_model_correction_updated/msbb.BM_44.PMI_AOD_race_sex_RIN_exonicRate_rRnaRate_batch_adj.tsv")
+# ROSMAP
+expr_rosmap <- fread("/sc/orga/projects/zhangb03a/shared/ROSMAP/Synapse/RNAseq/covariates_adjustment/expression.log2FPKM.batch_pmi_msex_RIN_adj.no_outliers.symbol_clean.tsv")
+# HBTRC CR AD sample
+expr_hb_rc <- fread("/sc/orga/projects/zhangb03a/shared/HBTRC/hbtrc_expression_data/xhbtrc-Alzh_CR_AgeCorrected_all.xls")
+# HBTRC PFC AD sample
+expr_hb_pfc <- fread("/sc/orga/projects/zhangb03a/shared/HBTRC/hbtrc_expression_data/xhbtrc-Alzh_PFC_AgeCorrected_all.xls")
+# HBTRC VC AD sample
+expr_hb_vc <- fread("/sc/orga/projects/zhangb03a/shared/HBTRC/hbtrc_expression_data/xhbtrc-Alzh_VC_AgeCorrected_all.xls")
+```
+
+
+Reading meta for 8 brain regions
+```{r}
+# BM10
+meta_bm10 <- fread("/sc/orga/projects/zhangb03a/shared/msbb-seq/Data/mixed_model_correction_updated/msbb.meta.BM_10.tsv")
+#BM22
+meta_bm22 <- fread("/sc/orga/projects/zhangb03a/shared/msbb-seq/Data/mixed_model_correction_updated/msbb.meta.BM_22.tsv")
+#BM36
+meta_bm36 <- fread("/sc/orga/projects/zhangb03a/shared/msbb-seq/Data/mixed_model_correction_updated/msbb.meta.BM_36.tsv")
+#BM22
+meta_bm44 <- fread("/sc/orga/projects/zhangb03a/shared/msbb-seq/Data/mixed_model_correction_updated/msbb.meta.BM_44.tsv")
+# ROSMAP
+meta_rosmap <- fread("/sc/orga/projects/zhangb03a/shared/ROSMAP/Synapse/RNAseq/covariates_adjustment/expression.log2FPKM.meta.tsv", skip = 1, drop = 1)
+colnames(meta_rosmap) <- qc(X,projid,study,age_first_ad_dx,age_death,age_at_visit_max,pmi,msex,educ,apoe_genotype,race,spanish,braaksc,ad_reagan,cts_mmse30_first_ad_dx,cts_mmse30_lv,ceradsc,cogdx,Rnaseqid,Batch,RINcontinuous,Sampleid,CERAD,Dx.by.braak.cerad)
+meta_rosmap$projid <- paste0("Proj", meta_rosmap$projid)
+```
+
+
+Extracting AD samples
+```{r Extracting AD samples}
+# BM10
+bm10_ad_sampleid <- meta_bm10[CERAD == "defAD"]$Sampleid
+expr_bm10_ad <- expr_bm10[, bm10_ad_sampleid, with = F]
+setDF(expr_bm10_ad)
+rownames(expr_bm10_ad) <- expr_bm10$Geneid
+
+# BM22
+bm22_ad_sampleid <- meta_bm22[CERAD == "defAD"]$Sampleid
+expr_bm22_ad <- expr_bm22[, bm22_ad_sampleid, with = F]
+setDF(expr_bm22_ad)
+rownames(expr_bm22_ad) <- expr_bm22$Geneid
+
+# BM36
+bm36_ad_sampleid <- meta_bm36[CERAD == "defAD"]$Sampleid
+expr_bm36_ad <- expr_bm36[, bm36_ad_sampleid, with = F]
+setDF(expr_bm36_ad)
+rownames(expr_bm36_ad) <- expr_bm36$Geneid
+
+# BM44
+bm44_ad_sampleid <- meta_bm44[CERAD == "defAD"]$Sampleid
+expr_bm44_ad <- expr_bm44[, bm44_ad_sampleid, with = F]
+setDF(expr_bm44_ad)
+rownames(expr_bm44_ad) <- expr_bm44$Geneid
+
+# ROSMAP
+rosmap_ad_sampleid <- meta_rosmap[CERAD == "DefiniteAD"]$projid
+expr_rosmap_ad <- expr_rosmap[, rosmap_ad_sampleid, with = F]
+setDF(expr_rosmap_ad)
+rownames(expr_rosmap_ad) <- expr_rosmap$Geneid
+
+# HBTRC CR
+setDF(expr_hb_rc)
+rownames(expr_hb_rc) <- expr_hb_rc$reporterid
+expr_hb_rc <- expr_hb_rc[, -(1:10)]
+
+# HBTRC PFC
+setDF(expr_hb_pfc)
+rownames(expr_hb_pfc) <- expr_hb_pfc$reporterid
+expr_hb_pfc <- expr_hb_pfc[, -(1:10)]
+
+# HBTRC VC
+setDF(expr_hb_vc)
+rownames(expr_hb_vc) <- expr_hb_vc$reporterid
+expr_hb_vc <- expr_hb_vc[, -(1:10)]
+```
+
+
+Preparing matrices for cor test
+```{r Preparing matrices for cor test}
+# BM10
+expr_ywhaz_ad_bm10_t <- t(expr_bm10_ad["ENSG00000164924", ])
+expr_bm10_ad_t <- t(expr_bm10_ad)
+
+# BM22
+expr_ywhaz_ad_bm22_t <- t(expr_bm22_ad["ENSG00000164924", ])
+expr_bm22_ad_t <- t(expr_bm22_ad)
+
+# BM36
+expr_ywhaz_ad_bm36_t <- t(expr_bm36_ad["ENSG00000164924", ])
+expr_bm36_ad_t <- t(expr_bm36_ad)
+
+# BM44
+expr_ywhaz_ad_bm44_t <- t(expr_bm44_ad["ENSG00000164924", ])
+expr_bm44_ad_t <- t(expr_bm44_ad)
+
+# ROSMAP
+expr_ywhaz_ad_rosmap_t <- t(expr_rosmap_ad["ENSG00000164924", ])
+expr_rosmap_ad_t <- t(expr_rosmap_ad)
+
+# HBTRC CR
+expr_ywhaz_ad_rc_t <- t(expr_hb_rc[c("10023817038", "10025903125"), ])
+expr_hb_rc_t <- t(expr_hb_rc)
+
+# HBTRC PFC
+expr_ywhaz_ad_pfc_t <- t(expr_hb_pfc[c("10023817038", "10025903125"), ])
+expr_hb_pfc_t <- t(expr_hb_pfc)
+
+# HBTRC VC
+expr_ywhaz_ad_vc_t <- t(expr_hb_vc[c("10023817038", "10025903125"), ])
+expr_hb_vc_t <- t(expr_hb_vc)
+```
+
+
+
+Correlation analysis between YWHAZ and genes in each AD dataset
+```{r Correlation analysis between YWHAZ and genes in each AD dataset}
+# ywhaz AD expression list
+expr_t_ls_ywhaz <- list(expr_ywhaz_ad_bm10_t, expr_ywhaz_ad_bm22_t, expr_ywhaz_ad_bm36_t, expr_ywhaz_ad_bm44_t, expr_ywhaz_ad_rosmap_t, expr_ywhaz_ad_rc_t, expr_ywhaz_ad_pfc_t, expr_ywhaz_ad_vc_t)
+
+# AD expression list
+expr_t_ls <- list(expr_bm10_ad_t, expr_bm22_ad_t, expr_bm36_ad_t, expr_bm44_ad_t, expr_rosmap_ad_t, expr_hb_rc_t, expr_hb_pfc_t, expr_hb_vc_t)
+
+# correlation test
+cor_results <- mapply(corRhoPvalSpearmanPearson_TwoMatrices, expr_t_ls_ywhaz, expr_t_ls, SIMPLIFY = F)
+
+# matrix to dataframe
+cor_results <- lapply(cor_results, as.data.frame, stringsAsFactors = F)
+
+# adjusting p value
+# spearman
+p_adj_spearman <- lapply(cor_results, function(x) p.adjust(as.numeric(x$pvalue_spearman, method = "BH")))
+#pearson
+p_adj_pearson <- lapply(cor_results, function(x) p.adjust(as.numeric(x$pvalue_pearson, method = "BH")))
+
+# adding p.adj column to each result
+# spearman
+cor_results <- mapply(function(x, y) "[<-"(x, "p.adj_spearman", value = y) , cor_results, p_adj_spearman, SIMPLIFY = FALSE)
+#pearson
+cor_results <- mapply(function(x, y) "[<-"(x, "p.adj_pearson", value = y) , cor_results, p_adj_pearson, SIMPLIFY = FALSE)
+```
+
+Writing the results
+```{r Writing the results}
+output_names <- paste0("/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/Corr_Results/", c("ywhaz_gene_cor_test_bm10.csv", "ywhaz_gene_cor_test_bm22.csv", "ywhaz_gene_cor_test_bm36.csv", "ywhaz_gene_cor_test_bm44.csv", "ywhaz_gene_cor_test_rosmap.csv", "ywhaz_gene_cor_test_hbcr.csv", "ywhaz_gene_cor_test_hbpfc.csv", "ywhaz_gene_cor_test_hbvc.csv"))
+
+invisible(mapply(fwrite, cor_results, output_names))
+```
+

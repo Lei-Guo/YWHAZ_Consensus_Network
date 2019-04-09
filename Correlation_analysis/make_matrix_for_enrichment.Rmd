@@ -1,0 +1,227 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+Rscript -e "rmarkdown::render('make_matrix_for_enrichment.Rmd')"
+```{r Loading packages}
+library(data.table)
+```
+
+
+Reading correlation results
+```{r Reading correlation results}
+cor_res_filename <- paste0("/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/Corr_Results/", list.files("/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/Corr_Results/", pattern = "ywhaz_gene_cor_test_"))
+
+cor_res <- lapply(cor_res_filename, fread)
+names(cor_res) <- basename(cor_res_filename)
+
+# getting common 
+
+# subsetting significant results
+cor_res_sig <- lapply(cor_res, function(x) x[p.adj_spearman < 0.05])
+
+# seperating cor_res by dataset
+cor_res_sig_hb <- cor_res_sig[5:7]
+cor_res_sig_hb1 <- lapply(cor_res_sig_hb, function(x) x[TraitA == 10023817038])
+cor_res_sig_hb2 <- lapply(cor_res_sig_hb, function(x) x[TraitA == 10025903125])                 
+
+
+cor_res_sig_bm <- cor_res_sig[1:4]
+cor_res_sig_ros <- cor_res_sig[[8]]
+
+# seperating cor_res by +/_ correlation
+cor_res_sig_bm_pos <- lapply(cor_res_sig_bm, function(x) x[rho_spearman > 0])
+cor_res_sig_bm_neg <- lapply(cor_res_sig_bm, function(x) x[rho_spearman < 0])
+
+cor_res_sig_ros_pos <- cor_res_sig_ros[rho_spearman > 0]
+cor_res_sig_ros_neg<- cor_res_sig_ros[rho_spearman < 0]
+
+cor_res_sig_hb1_pos <- lapply(cor_res_sig_hb1, function(x) x[rho_spearman > 0])
+cor_res_sig_hb1_neg <- lapply(cor_res_sig_hb1, function(x) x[rho_spearman < 0])
+
+cor_res_sig_hb2_pos <- lapply(cor_res_sig_hb2, function(x) x[rho_spearman > 0])
+cor_res_sig_hb2_neg <- lapply(cor_res_sig_hb2, function(x) x[rho_spearman < 0])
+```
+
+Reading gene expression values for 8 brain regions
+```{r Reading gene expression values for 8 brain regions}
+# BM10
+expr_bm10 <- fread("/sc/orga/projects/zhangb03a/shared/msbb-seq/Data/mixed_model_correction_updated/msbb.BM_10.PMI_AOD_race_sex_RIN_exonicRate_rRnaRate_batch_adj.tsv")
+# ROSMAP
+expr_rosmap <- fread("/sc/orga/projects/zhangb03a/shared/ROSMAP/Synapse/RNAseq/covariates_adjustment/expression.log2FPKM.batch_pmi_msex_RIN_adj.no_outliers.symbol_clean.tsv")
+# HBTRC CR AD sample
+expr_hb_rc <- fread("/sc/orga/projects/zhangb03a/shared/HBTRC/hbtrc_expression_data/xhbtrc-Alzh_CR_AgeCorrected_all.xls")
+```
+
+Making GeneID-Symbol annotation table for each dataset
+```{r Making GeneID-Symbol annotation table for each dataset}
+# msbb
+annot_msbb <- expr_bm10[, 1:2]
+
+# rosmap
+annot_rosmap <- expr_rosmap[, 1:2]
+
+# hb
+annot_hb <- expr_hb_rc[, c(1,3)]
+colnames(annot_hb) <- c("Geneid", "Symbol")
+annot_hb$Geneid <- as.character(annot_hb$Geneid)
+```
+
+Annotating Geneid
+```{r Annotating Geneid}
+# msbb
+cor_res_sig_bm_sym <- lapply(cor_res_sig_bm, function(x) unique(annot_msbb$Symbol[match(x$TraitB, annot_msbb$Geneid)]))
+mod_bm <- mapply(rep, c("YWHAZ_BM10", "YWHAZ_BM22", "YWHAZ_BM36", "YWHAZ_BM44"), lengths(cor_res_sig_bm_sym), MoreArgs = list(SIMPLIFY = F))
+ywhaz_mx_bm <- mapply(cbind, cor_res_sig_bm_sym, mod_bm)
+ywhaz_mx_bm <- lapply(ywhaz_mx_bm, as.data.frame)
+
+cor_res_sig_bm_pos_sym <- lapply(cor_res_sig_bm_pos, function(x) unique(annot_msbb$Symbol[match(x$TraitB, annot_msbb$Geneid)]))
+mod_bm_pos <- mapply(rep, c("YWHAZ_bm10_pos", "YWHAZ_bm22_pos", "YWHAZ_bm36_pos", "YWHAZ_bm44_pos"), lengths(cor_res_sig_bm_pos_sym), MoreArgs = list(SIMPLIFY = F))
+ywhaz_mx_bm_pos <- mapply(cbind, cor_res_sig_bm_pos_sym, mod_bm_pos)
+ywhaz_mx_bm_pos <- lapply(ywhaz_mx_bm_pos, as.data.frame)
+
+cor_res_sig_bm_neg_sym <- lapply(cor_res_sig_bm_neg, function(x) unique(annot_msbb$Symbol[match(x$TraitB, annot_msbb$Geneid)]))
+mod_bm_neg <- mapply(rep, c("YWHAZ_bm10_neg", "YWHAZ_bm22_neg", "YWHAZ_bm36_neg", "YWHAZ_bm44_neg"), lengths(cor_res_sig_bm_neg_sym), MoreArgs = list(SIMPLIFY = F))
+ywhaz_mx_bm_neg <- mapply(cbind, cor_res_sig_bm_neg_sym, mod_bm_neg)
+ywhaz_mx_bm_neg <- lapply(ywhaz_mx_bm_neg, as.data.frame)
+
+# rosmap
+cor_res_sig_ros_sym <- unique(annot_rosmap$Symbol[match(cor_res_sig_ros$TraitB, annot_rosmap$Geneid)])
+mod_ros <- rep("YWHAZ_ROSMAP", length(cor_res_sig_ros_sym))
+ywhaz_mx_ros <- as.data.frame(cbind(cor_res_sig_ros_sym, mod_ros))
+colnames(ywhaz_mx_ros) <- c("V1", "V2")
+
+cor_res_sig_ros_pos_sym <- unique(annot_rosmap$Symbol[match(cor_res_sig_ros_pos$TraitB, annot_rosmap$Geneid)])
+mod_ros_pos <- rep("YWHAZ_ROSMAP_pos", length(cor_res_sig_ros_pos_sym))
+ywhaz_mx_ros_pos <- as.data.frame(cbind(cor_res_sig_ros_pos_sym, mod_ros_pos))
+colnames(ywhaz_mx_ros_pos) <- c("V1", "V2")
+
+cor_res_sig_ros_neg_sym <- unique(annot_rosmap$Symbol[match(cor_res_sig_ros_neg$TraitB, annot_rosmap$Geneid)])
+mod_ros_neg <- rep("YWHAZ_ROSMAP_neg", length(cor_res_sig_ros_neg_sym))
+ywhaz_mx_ros_neg <- as.data.frame(cbind(cor_res_sig_ros_neg_sym, mod_ros_neg))
+colnames(ywhaz_mx_ros_neg) <- c("V1", "V2")
+
+# hb1
+cor_res_sig_hb1_sym <- lapply(cor_res_sig_hb1, function(x) unique(annot_hb$Symbol[match(as.character(x$TraitB), annot_hb$Geneid)]))
+mod_hb1 <- mapply(rep, paste0(annot_hb$Symbol[match("10023817038", annot_hb$Geneid)], "_V1_", c("HBCR", "HBPFC", "HBVC")), lengths(cor_res_sig_hb1_sym), MoreArgs = list(SIMPLIFY = F))
+ywhaz_mx_hb1 <- mapply(cbind, cor_res_sig_hb1_sym, mod_hb1)
+ywhaz_mx_hb1 <- lapply(ywhaz_mx_hb1, as.data.frame)
+
+cor_res_sig_hb1_pos_sym <- lapply(cor_res_sig_hb1_pos, function(x) unique(annot_hb$Symbol[match(as.character(x$TraitB), annot_hb$Geneid)]))
+mod_hb1_pos <- mapply(rep, paste0(annot_hb$Symbol[match("10023817038", annot_hb$Geneid)], "_V1_", c("HBCR_pos", "HBPFC_pos", "HBVC_pos")), lengths(cor_res_sig_hb1_pos_sym), MoreArgs = list(SIMPLIFY = F))
+ywhaz_mx_hb1_pos <- mapply(cbind, cor_res_sig_hb1_pos_sym, mod_hb1_pos)
+ywhaz_mx_hb1_pos <- lapply(ywhaz_mx_hb1_pos, as.data.frame)
+
+cor_res_sig_hb1_neg_sym <- lapply(cor_res_sig_hb1_neg, function(x) unique(annot_hb$Symbol[match(as.character(x$TraitB), annot_hb$Geneid)]))
+mod_hb1_neg <- mapply(rep, paste0(annot_hb$Symbol[match("10023817038", annot_hb$Geneid)], "_V1_", c("HBCR_neg", "HBPFC_neg", "HBVC_neg")), lengths(cor_res_sig_hb1_neg_sym), MoreArgs = list(SIMPLIFY = F))
+ywhaz_mx_hb1_neg <- mapply(cbind, cor_res_sig_hb1_neg_sym, mod_hb1_neg)
+ywhaz_mx_hb1_neg <- lapply(ywhaz_mx_hb1_neg, as.data.frame)
+
+# hb2
+cor_res_sig_hb2_sym <- lapply(cor_res_sig_hb2, function(x) unique(annot_hb$Symbol[match(as.character(x$TraitB), annot_hb$Geneid)]))
+mod_hb2 <- mapply(rep, paste0(annot_hb$Symbol[match("10025903125", annot_hb$Geneid)], "_V2_", c("HBCR", "HBPFC", "HBVC")), lengths(cor_res_sig_hb2_sym), MoreArgs = list(SIMPLIFY = F))
+ywhaz_mx_hb2 <- mapply(cbind, cor_res_sig_hb2_sym, mod_hb2)
+ywhaz_mx_hb2 <- lapply(ywhaz_mx_hb2, as.data.frame)
+
+cor_res_sig_hb2_pos_sym <- lapply(cor_res_sig_hb2_pos, function(x) unique(annot_hb$Symbol[match(as.character(x$TraitB), annot_hb$Geneid)]))
+mod_hb2_pos <- mapply(rep, paste0(annot_hb$Symbol[match("10023817038", annot_hb$Geneid)], "_V1_", c("HBCR_pos", "HBPFC_pos", "HBVC_pos")), lengths(cor_res_sig_hb2_pos_sym), MoreArgs = list(SIMPLIFY = F))
+ywhaz_mx_hb2_pos <- mapply(cbind, cor_res_sig_hb2_pos_sym, mod_hb2_pos)
+ywhaz_mx_hb2_pos <- lapply(ywhaz_mx_hb2_pos, as.data.frame)
+
+cor_res_sig_hb2_neg_sym <- lapply(cor_res_sig_hb2_neg, function(x) unique(annot_hb$Symbol[match(as.character(x$TraitB), annot_hb$Geneid)]))
+mod_hb2_neg <- mapply(rep, paste0(annot_hb$Symbol[match("10023817038", annot_hb$Geneid)], "_V1_", c("HBCR_neg", "HBPFC_neg", "HBVC_neg")), lengths(cor_res_sig_hb2_neg_sym), MoreArgs = list(SIMPLIFY = F))
+ywhaz_mx_hb2_neg <- mapply(cbind, cor_res_sig_hb2_neg_sym, mod_hb2_neg)
+ywhaz_mx_hb2_neg <- lapply(ywhaz_mx_hb2_neg, as.data.frame)
+
+# combine the dfs
+ywhaz_df_all <- rbindlist(c(ywhaz_mx_bm, ywhaz_mx_bm_pos, ywhaz_mx_bm_neg,list(ywhaz_mx_ros, ywhaz_mx_ros_pos, ywhaz_mx_ros_neg), ywhaz_mx_hb1, ywhaz_mx_hb1_pos, ywhaz_mx_hb1_neg, ywhaz_mx_hb2, ywhaz_mx_hb2_pos, ywhaz_mx_hb2_neg))
+colnames(ywhaz_df_all) <- c("Genes_cor_YWHAZ", "Datasets")
+```
+
+Reading YWHAZ KO/KD DEGs
+```{r Reading YWHAZ KO KD DEGs}
+deg_filename <- paste0("/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/DE_Results/", list.files("/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/DE_Results/"))
+
+degs <- lapply(deg_filename, fread)
+names(degs) <- basename(deg_filename)
+
+degs_all_gene_sym <- toupper(unique(unlist(lapply(degs, function(x) x$V1))))
+
+# seperating KD and KO
+degs_kd <- degs[1:3]
+degs_ko <- degs[[4]]
+
+# subsetting significant results
+degs_kd_sig_sym <- lapply(degs_kd, function(x) toupper(x[adj.P.Val < 0.05][[1]]))
+degs_ko_sig_sym <- toupper(degs_ko[P.Value < 0.05][[1]])
+
+degs_kd_sig_mod <- mapply(rep, paste0("YWHAZ_KD_", c("0h", "24h", "48h")), lengths(degs_kd_sig_sym), MoreArgs = list(SIMPLIFY = F))
+degs_ko_sig_mod <- rep("YWHAZ_KO", length(degs_ko_sig_sym))
+
+# making deg tables
+degs_kd_sig_df <- mapply(cbind, degs_kd_sig_sym, degs_kd_sig_mod)
+degs_kd_sig_df <- lapply(degs_kd_sig_df, as.data.frame)
+
+degs_ko_sig_df <- as.data.frame(cbind(degs_ko_sig_sym, degs_ko_sig_mod))
+colnames(degs_ko_sig_df) <- c("V1", "V2")
+
+
+
+degs_kd_sig_pos_sym <- lapply(degs_kd, function(x) toupper(x[adj.P.Val < 0.05 & logFC > 0][[1]]))
+degs_ko_sig_pos_sym <- toupper(degs_ko[P.Value < 0.05 & logFC > 0][[1]])
+
+degs_kd_sig_pos_mod <- mapply(rep, paste0("YWHAZ_KD_", c("0h_pos", "24h_pos", "48h_pos")), lengths(degs_kd_sig_pos_sym), MoreArgs = list(SIMPLIFY = F))
+degs_ko_sig_pos_mod <- rep("YWHAZ_KO_pos", length(degs_ko_sig_pos_sym))
+
+# making deg tables
+degs_kd_sig_pos_df <- mapply(cbind, degs_kd_sig_pos_sym, degs_kd_sig_pos_mod)
+degs_kd_sig_pos_df <- lapply(degs_kd_sig_pos_df, as.data.frame)
+
+degs_ko_sig_pos_df <- as.data.frame(cbind(degs_ko_sig_pos_sym, degs_ko_sig_pos_mod))
+colnames(degs_ko_sig_pos_df) <- c("V1", "V2")
+
+degs_kd_ko_pos_df <- rbindlist(c(degs_kd_sig_pos_df, list(degs_ko_sig_pos_df)))
+colnames(degs_kd_ko_pos_df) <- c("DEGs", "YWHAZ_KD_KO")
+
+
+
+degs_kd_sig_neg_sym <- lapply(degs_kd, function(x) toupper(x[adj.P.Val < 0.05 & logFC < 0][[1]]))
+degs_ko_sig_neg_sym <- toupper(degs_ko[P.Value < 0.05 & logFC < 0][[1]])
+
+degs_kd_sig_neg_mod <- mapply(rep, paste0("YWHAZ_KD_", c("0h_neg", "24h_neg", "48h_neg")), lengths(degs_kd_sig_neg_sym), MoreArgs = list(SIMPLIFY = F))
+degs_ko_sig_neg_mod <- rep("YWHAZ_KO_neg", length(degs_ko_sig_neg_sym))
+
+# making deg tables
+degs_kd_sig_neg_df <- mapply(cbind, degs_kd_sig_neg_sym, degs_kd_sig_neg_mod)
+degs_kd_sig_neg_df <- lapply(degs_kd_sig_neg_df, as.data.frame)
+
+degs_ko_sig_neg_df <- as.data.frame(cbind(degs_ko_sig_neg_sym, degs_ko_sig_neg_mod))
+colnames(degs_ko_sig_neg_df) <- c("V1", "V2")
+
+degs_kd_ko_neg_df <- rbindlist(c(degs_kd_sig_neg_df, list(degs_ko_sig_neg_df)))
+colnames(degs_kd_ko_neg_df) <- c("DEGs", "YWHAZ_KD_KO")
+
+
+
+degs_kd_ko_df <- rbindlist(c(degs_kd_sig_df, degs_kd_sig_pos_df, degs_kd_sig_neg_df, list(degs_ko_sig_df, degs_ko_sig_pos_df, degs_ko_sig_neg_df)))
+colnames(degs_kd_ko_df) <- c("DEGs", "YWHAZ_KD_KO")
+```
+
+
+selecting the common genes across the 9 datasets
+```{r selecting the common genes across the 9 datasets}
+# all genes across the 9 datasets
+all_genes <- unique(c(annot_msbb$Symbol, annot_rosmap$Symbol, annot_hb$Symbol, degs_all_gene_sym))
+length(all_genes)
+```
+
+
+Writing results
+```{r Writing results}
+fwrite(ywhaz_df_all, "/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/Corr_Results/Genes_sig_cor_YWHAZ_8_datasets.tsv", sep = "\t")
+
+fwrite(degs_kd_ko_df, "/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/Corr_Results/YWHAZ_KD_KO_DEG.tsv", sep = "\t")
+```
+

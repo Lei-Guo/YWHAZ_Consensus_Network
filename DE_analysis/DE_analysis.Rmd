@@ -1,0 +1,129 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Rscript -e "rmarkdown::render('DE_analysis.Rmd')"
+
+```{r loading packages, message = FALSE, warning = FALSE}
+library(limma)
+library(data.table)
+library(Biobase)
+```
+
+Reading expressionsets
+```{r reading the expressionsets, message = FALSE}
+# read expressionset
+exprset_ywhaz_ko_kd <- readRDS("/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/Datasets/exprset_YWHAZ_KO_KD_RNAseq_TPM_GSE66716_GSE60745.rds")
+```
+
+
+Checking sample number in each group
+```{r checking sample number in each group}
+as.data.frame(table(pData(exprset_ywhaz_ko_kd)$Treatment))
+```
+
+
+Between KO and WT (in vivo)
+
+DE analysis for KO-WT
+```{r DE analysis for KO-WT}
+# subset AD and Normal
+exprset_ywhaz_ko <- exprset_ywhaz_ko_kd[ , exprset_ywhaz_ko_kd$Treatment == "KO" | exprset_ywhaz_ko_kd$Treatment == "WT"]
+
+# make design matrix
+design_ko_wt <- model.matrix(~ 0 + factor(exprset_ywhaz_ko$Treatment))
+colnames(design_ko_wt) <- levels(factor(exprset_ywhaz_ko$Treatment))
+
+# make contrast matrix
+contrast_ko_wt <- makeContrasts(contrasts = "KO-WT", levels = design_ko_wt)
+
+# de analyis
+fit_ko_wt <- lmFit(exprset_ywhaz_ko, design_ko_wt)
+fit_ko_wt_2 <- contrasts.fit(fit_ko_wt, contrast_ko_wt)
+fit_ko_wt_2 <- eBayes(fit_ko_wt_2)
+
+# look at the numbers of DM CpGs at FDR < 0.05
+summary(decideTests(fit_ko_wt_2))
+
+# save de results
+res_ko_wt <- topTable(fit_ko_wt_2, n = Inf)
+```
+
+Between KD and control (in vitro)
+
+DE analysis for KD-0
+```{r DE analysis for KD-0}
+exprset_ywhaz_kd_0 <- exprset_ywhaz_ko_kd[ , exprset_ywhaz_ko_kd$Treatment == "si_zeta_0" | exprset_ywhaz_ko_kd$Treatment == "si_Control_0"]
+
+
+design_kd_0 <- model.matrix(~ 0 + factor(exprset_ywhaz_kd_0$Treatment))
+colnames(design_kd_0) <- levels(factor(exprset_ywhaz_kd_0$Treatment))
+
+# make contrast matrix
+contrast_kd_0 <- makeContrasts(contrasts = "si_zeta_0-si_Control_0", levels = design_kd_0)
+
+# de analyis
+fit_kd_0 <- lmFit(exprset_ywhaz_kd_0, design_kd_0)
+fit_kd_0_2 <- contrasts.fit(fit_kd_0, contrast_kd_0)
+fit_kd_0_2 <- eBayes(fit_kd_0_2)
+
+# look at the numbers of DM CpGs at FDR < 0.05
+summary(decideTests(fit_kd_0_2))
+
+# save de results
+res_kd_0 <- topTable(fit_kd_0_2, n = Inf)
+```
+
+DE analysis for KD-24
+```{r DE analysis for KD-24}
+exprset_ywhaz_kd_24 <- exprset_ywhaz_ko_kd[ , exprset_ywhaz_ko_kd$Treatment == "si_zeta_24" | exprset_ywhaz_ko_kd$Treatment == "si_Control_24"]
+
+
+design_kd_24 <- model.matrix(~ 0 + factor(exprset_ywhaz_kd_24$Treatment))
+colnames(design_kd_24) <- levels(factor(exprset_ywhaz_kd_24$Treatment))
+
+# make contrast matrix
+contrast_kd_24 <- makeContrasts(contrasts = "si_zeta_24-si_Control_24", levels = design_kd_24)
+
+# de analyis
+fit_kd_24 <- lmFit(exprset_ywhaz_kd_24, design_kd_24)
+fit_kd_24_2 <- contrasts.fit(fit_kd_24, contrast_kd_24)
+fit_kd_24_2 <- eBayes(fit_kd_24_2)
+
+# look at the numbers of DM CpGs at FDR < 24.245
+summary(decideTests(fit_kd_24_2))
+
+# save de results
+res_kd_24 <- topTable(fit_kd_24_2, n = Inf)
+```
+
+DE analysis for KD-48
+```{r DE analysis for KD-48}
+exprset_ywhaz_kd_48 <- exprset_ywhaz_ko_kd[ , exprset_ywhaz_ko_kd$Treatment == "si_zeta_48" | exprset_ywhaz_ko_kd$Treatment == "si_Control_48"]
+
+
+design_kd_48 <- model.matrix(~ 0 + factor(exprset_ywhaz_kd_48$Treatment))
+colnames(design_kd_48) <- levels(factor(exprset_ywhaz_kd_48$Treatment))
+
+# make contrast matrix
+contrast_kd_48 <- makeContrasts(contrasts = "si_zeta_48-si_Control_48", levels = design_kd_48)
+
+# de analyis
+fit_kd_48 <- lmFit(exprset_ywhaz_kd_48, design_kd_48)
+fit_kd_48_2 <- contrasts.fit(fit_kd_48, contrast_kd_48)
+fit_kd_48_2 <- eBayes(fit_kd_48_2)
+
+# look at the numbers of DM CpGs at FDR < 48.485
+summary(decideTests(fit_kd_48_2))
+
+# save de results
+res_kd_48 <- topTable(fit_kd_48_2, n = Inf)
+```
+
+
+Writing the results
+```{r writing the DMP results, message = F}
+# write the results
+invisible(mapply(fwrite, list(res_ko_wt, res_kd_0, res_kd_24, res_kd_48), paste0("/sc/orga/projects/zhangb03a/lei_guo/YWHAZ/DE_Results/", c("DEG_YWHAZ_KO_WT_GSE66716.csv", "DEG_YWHAZ_KD_Control_0h_GSE66716.csv", "DEG_YWHAZ_KD_Control_24h_GSE66716.csv", "DEG_YWHAZ_KD_Control_48h_GSE66716.csv")), MoreArgs = list(row.names = T)))
+```
